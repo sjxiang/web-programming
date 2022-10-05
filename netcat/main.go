@@ -1,56 +1,58 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"os"
+	"time"
 )
 
-/*
-实现简易的 netcat TCP 客户都
+var (
+	verbose bool 
+	timeout int
+)
+
+const DefaultTimeout = 0
+
+func init() {
+	flag.IntVar(&timeout, "w", DefaultTimeout, "无法建立或闲置超时的连接，读秒后")
+	flag.BoolVar(&verbose, "v", false, "提供更多详情")
+	flag.Parse()  // 先筛一遍
+}
 
 
-nc www.baidu.com 80  # 连接到 www.baidu.com 80 端口，发送数据
-GET / HTTP/1.1
-\r\n
+func checkError(err error) {
+	if err == nil {
+		return 
+	}
 
-读取命令行参数 
-	os.Args
-	[]string{"nc", "www.baidu.com", "80"}
+	if verbose {
+		fmt.Fprint(os.Stderr, err)
+	}
 
-
-建立 TCP 连接
-	net.Dial()
-
-
-网络数据读写
-	net.Conn
-		Read 读取
-		Write 写入
-		Close 回收 IO
-
-	io.Copy 双工 阻塞
-		
-		*/
-
+	os.Exit(1)
+}
 
 
 func main() {
-	fmt.Println(os.Args)
-
-	if len(os.Args) != 3 {
-		log.Fatal("用法：nc host port")
+	
+	// 解析参数，之气筛过 1 遍，还剩下 [host, port]
+	args := flag.Args()
+	if len(args) != 2 {
+		flag.Usage()
+		os.Exit(1)
 	}
 
-	host := os.Args[1]
-	port := os.Args[2]
+	host := os.Args[0]
+	port := os.Args[1]
 
-	conn, err := net.Dial("tcp", host + ":" + port)
-	if err != nil {
-		log.Fatal(err)
-	}
+
+	// 连接服务器
+	timeout := time.Duration(timeout) * time.Second
+	conn, err := net.DialTimeout("tcp", host + ":" + port, timeout)
+	checkError(err)
 	defer conn.Close()  // 发送 FIN 包，指示目标端口断开连接
 
 	go func ()  {
@@ -60,4 +62,5 @@ func main() {
 	
 	// 读取目标端口的数据，并写入到标准输出
 	io.Copy(os.Stdout, conn)
+
 }
